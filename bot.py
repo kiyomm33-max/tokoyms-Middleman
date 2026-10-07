@@ -19,9 +19,9 @@ from discord import ButtonStyle
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-MIDDLEMAN_ROLE_ID = int(os.getenv("MIDDLEMAN_ROLE_ID", "1553614474101919844"))
-OWNER_ROLE_ID = int(os.getenv("OWNER_ROLE_ID", "1551174698069528626"))
-TICKET_CATEGORY_ID = int(os.getenv("TICKET_CATEGORY_ID", "1551211906251886622"))
+MIDDLEMAN_ROLE_ID = int(os.getenv("MIDDLEMAN_ROLE_ID", "1557255996647153714"))
+OWNER_ROLE_ID = int(os.getenv("OWNER_ROLE_ID", "1556390123203989644"))
+TICKET_CATEGORY_ID = int(os.getenv("TICKET_CATEGORY_ID", "1557256486176952351"))
 
 # Persistent ticket file.
 # This is a backup, but ticket information is ALSO stored in
