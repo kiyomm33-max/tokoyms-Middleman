@@ -1,10 +1,9 @@
 # ============================================================
-# 🌸 TOKYOMS MIDDLEMAN TICKET BOT
+# MM2 Base MM TICKET BOT
 # ============================================================
 
 import os
 import re
-import json
 import asyncio
 import discord
 
@@ -19,44 +18,35 @@ from discord import ButtonStyle
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-MIDDLEMAN_ROLE_ID = int(os.getenv("MIDDLEMAN_ROLE_ID", "1557255996647153714"))
-OWNER_ROLE_ID = int(os.getenv("OWNER_ROLE_ID", "1556390123203989644"))
-TICKET_CATEGORY_ID = int(os.getenv("TICKET_CATEGORY_ID", "1557256486176952351"))
-
-# Persistent ticket file.
-# This is a backup, but ticket information is ALSO stored in
-# the Discord channel topic so the claim system can recover
-# even when the bot restarts.
-TICKET_FILE = "tickets.json"
-
-# TokyoMs images supplied for the server.
-PANEL_BANNER_URL = (
-    "https://media.discordapp.net/attachments/1551900302146281554/"
-    "1557109839681953904/TMS_banner.gif?backend=b2&ex=6ac69b0b&"
-    "is=6ab5498b&hm=2ba841228ebf004e747f0687006b4cefe0991bbf9091156599a2030725e31951&"
-    "=&width=894&height=503"
+MIDDLEMAN_ROLE_ID = int(
+    os.getenv("MIDDLEMAN_ROLE_ID", "1558800992626020444")
 )
 
-TICKET_BANNER_URL = PANEL_BANNER_URL
-
-PANEL_ICON_URL = (
-    "https://media.discordapp.net/attachments/1551900302146281554/"
-    "1557100302146281554/TMS.gif"
+OWNER_ROLE_ID = int(
+    os.getenv("OWNER_ROLE_ID", "1556390123203989644")
 )
 
-# Use the exact thumbnail URL from your server if needed.
-# If the URL above stops working because Discord changes its CDN URL,
-# replace it with your current TMS.gif attachment URL.
+TICKET_CATEGORY_ID = int(
+    os.getenv("TICKET_CATEGORY_ID", "1558794011911782490")
+)
 
-PINK = discord.Color.from_rgb(255, 182, 193)
+# GOLDEN ORANGE EMBED COLOR
+EMBED_COLOR = discord.Color.from_rgb(240, 157, 82)
 
 
 # ============================================================
-# TOKEN CHECK
+# BANNERS / ICON
 # ============================================================
+
+PANEL_BANNER_URL = "https://cdn.discordapp.com/attachments/1541827959176958076/1558790971829919815/aaaaaaaaaaaaaaaaaaaaa.png?ex=6accb8b8&is=6acb6738&hm=15677a101b0a5df6a70b4fa761a2a99e3d1fd90c9d2693e04d7775276081be66&"
+
+TICKET_BANNER_URL = "https://cdn.discordapp.com/attachments/1541827959176958076/1558790971829919815/aaaaaaaaaaaaaaaaaaaaa.png?ex=6accb8b8&is=6acb6738&hm=15677a101b0a5df6a70b4fa761a2a99e3d1fd90c9d2693e04d7775276081be66&"
+
+PANEL_ICON_URL = "https://cdn.discordapp.com/attachments/1541827959176958076/1558790828468740167/1427114945694400515_icon.gif?ex=6accb896&is=6acb6716&hm=fa0b625e7ecb102886c16c683c05173052aca54236c8c4c996da0548e69acf6d&"
+
 
 if not TOKEN:
-    raise RuntimeError("DISCORD_TOKEN is not set.")
+    raise RuntimeError("DISCORD_TOKEN is not set")
 
 
 # ============================================================
@@ -73,48 +63,11 @@ bot = commands.Bot(
     help_command=None
 )
 
-
-# ============================================================
-# IN-MEMORY + PERSISTENT STORAGE
-# ============================================================
-
 tickets = {}
 
 
-def load_tickets():
-    global tickets
-
-    try:
-        if os.path.exists(TICKET_FILE):
-            with open(TICKET_FILE, "r", encoding="utf-8") as f:
-                raw = json.load(f)
-
-            tickets = {
-                int(channel_id): data
-                for channel_id, data in raw.items()
-            }
-
-    except (json.JSONDecodeError, OSError, ValueError):
-        tickets = {}
-
-
-def save_tickets():
-    try:
-        with open(TICKET_FILE, "w", encoding="utf-8") as f:
-            json.dump(
-                {str(k): v for k, v in tickets.items()},
-                f,
-                indent=4
-            )
-    except OSError as e:
-        print(f"[TICKETS] Could not save tickets.json: {e}")
-
-
-load_tickets()
-
-
 # ============================================================
-# ROLE HELPERS
+# HELPERS
 # ============================================================
 
 def get_middleman_role(guild: discord.Guild):
@@ -127,142 +80,40 @@ def get_owner_role(guild: discord.Guild):
 
 def is_middleman(member: discord.Member):
     role = get_middleman_role(member.guild)
-    return role is not None and role in member.roles
+    return role in member.roles if role else False
 
 
 def is_owner(member: discord.Member):
     role = get_owner_role(member.guild)
-    return role is not None and role in member.roles
+    return role in member.roles if role else False
 
-
-# ============================================================
-# GENERAL HELPERS
-# ============================================================
 
 def clean_channel_name(name: str):
     name = name.lower()
     name = re.sub(r"[^a-z0-9-]", "-", name)
     name = re.sub(r"-+", "-", name)
-    return name[:90].strip("-") or "middleman-ticket"
+    return name[:90]
 
 
 async def find_user(guild: discord.Guild, value: str):
     value = value.strip()
-
     match = re.fullmatch(r"<@!?(\d+)>", value)
 
     if match:
         user_id = int(match.group(1))
-
     elif value.isdigit():
         user_id = int(value)
-
     else:
-        member = discord.utils.find(
-            lambda m:
-                m.name.lower() == value.lower()
-                or m.display_name.lower() == value.lower(),
+        return discord.utils.find(
+            lambda m: m.name.lower() == value.lower()
+            or m.display_name.lower() == value.lower(),
             guild.members
         )
-
-        return member
 
     try:
         return guild.get_member(user_id) or await guild.fetch_member(user_id)
     except (discord.NotFound, discord.HTTPException):
         return None
-
-
-# ============================================================
-# TICKET TOPIC STORAGE
-# ============================================================
-# The channel topic contains the ticket data.
-#
-# Example:
-# tmsticket|owner=123|trader=456|game=Murder Mystery 2|claimed=0
-#
-# This is the IMPORTANT fix for:
-# "Ticket data was not found."
-# ============================================================
-
-def make_ticket_topic(ticket):
-    game = str(ticket.get("game", "Others")).replace("|", "")
-    return (
-        f"tmsticket|"
-        f"owner={ticket.get('owner', 0)}|"
-        f"trader={ticket.get('trader', 0)}|"
-        f"game={game}|"
-        f"claimed={ticket.get('claimed_by') or 0}"
-    )
-
-
-def parse_ticket_topic(topic):
-    if not topic or not topic.startswith("tmsticket|"):
-        return None
-
-    parts = topic.split("|")
-    data = {}
-
-    for part in parts[1:]:
-        if "=" not in part:
-            continue
-
-        key, value = part.split("=", 1)
-        data[key] = value
-
-    try:
-        owner = int(data.get("owner", "0"))
-        trader = int(data.get("trader", "0"))
-        claimed = int(data.get("claimed", "0"))
-    except ValueError:
-        return None
-
-    if not owner or not trader:
-        return None
-
-    return {
-        "owner": owner,
-        "trader": trader,
-        "game": data.get("game", "Others"),
-        "claimed_by": claimed or None,
-        "giving": "",
-        "trader_giving": "",
-        "private_links": ""
-    }
-
-
-def get_ticket(channel: discord.abc.GuildChannel):
-    """
-    Get ticket data from memory first.
-
-    If it isn't in memory, recover it from the channel topic.
-    This fixes the claim button when the temporary dictionary
-    does not contain the channel ID.
-    """
-
-    if channel.id in tickets:
-        return tickets[channel.id]
-
-    recovered = parse_ticket_topic(getattr(channel, "topic", ""))
-
-    if recovered:
-        tickets[channel.id] = recovered
-        save_tickets()
-        return recovered
-
-    return None
-
-
-async def save_ticket_to_channel(channel, ticket):
-    try:
-        await channel.edit(
-            topic=make_ticket_topic(ticket),
-            reason="Update middleman ticket data"
-        )
-    except discord.Forbidden:
-        print(f"[TICKETS] Missing permission to edit topic in #{channel.name}")
-    except discord.HTTPException as e:
-        print(f"[TICKETS] Could not update topic: {e}")
 
 
 # ============================================================
@@ -273,7 +124,6 @@ class MiddlemanRequestModal(Modal):
 
     def __init__(self, selected_game: str):
         super().__init__(title=f"{selected_game} Middleman Request")
-
         self.selected_game = selected_game
 
         self.trader_input = TextInput(
@@ -306,26 +156,20 @@ class MiddlemanRequestModal(Modal):
             max_length=20
         )
 
-        self.add_item(self.trader_input)
-        self.add_item(self.giving_input)
-        self.add_item(self.trader_giving_input)
-        self.add_item(self.private_input)
+        for item in (
+            self.trader_input,
+            self.giving_input,
+            self.trader_giving_input,
+            self.private_input
+        ):
+            self.add_item(item)
 
     async def on_submit(self, interaction: discord.Interaction):
-
         guild = interaction.guild
-
         if guild is None:
-            await interaction.response.send_message(
-                "❌ This can only be used inside a server.",
-                ephemeral=True
-            )
             return
 
-        trader = await find_user(
-            guild,
-            self.trader_input.value
-        )
+        trader = await find_user(guild, self.trader_input.value)
 
         if not trader:
             await interaction.response.send_message(
@@ -341,65 +185,59 @@ class MiddlemanRequestModal(Modal):
             )
             return
 
-        category = None
-
-        if TICKET_CATEGORY_ID:
-            possible_category = guild.get_channel(TICKET_CATEGORY_ID)
-
-            if isinstance(possible_category, discord.CategoryChannel):
-                category = possible_category
-
-        mm_role = get_middleman_role(guild)
-        owner_role = get_owner_role(guild)
+        category = guild.get_channel(TICKET_CATEGORY_ID) if TICKET_CATEGORY_ID else None
+        if not isinstance(category, discord.CategoryChannel):
+            category = None
 
         overwrites = {
-            guild.default_role: discord.PermissionOverwrite(
-                view_channel=False
-            ),
-
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user: discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                read_message_history=True,
-                attach_files=True,
-                embed_links=True
+                view_channel=True, send_messages=True,
+                read_message_history=True, attach_files=True, embed_links=True
             ),
-
             trader: discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                read_message_history=True,
-                attach_files=True,
-                embed_links=True
+                view_channel=True, send_messages=True,
+                read_message_history=True, attach_files=True, embed_links=True
             )
         }
 
+        mm_role = get_middleman_role(guild)
         if mm_role:
             overwrites[mm_role] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                read_message_history=True,
-                attach_files=True,
-                embed_links=True,
-                manage_messages=True
+                view_channel=True, send_messages=True,
+                read_message_history=True, attach_files=True,
+                embed_links=True, manage_messages=True
             )
 
+        owner_role = get_owner_role(guild)
         if owner_role:
             overwrites[owner_role] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                read_message_history=True,
-                attach_files=True,
-                embed_links=True,
-                manage_messages=True
+                view_channel=True, send_messages=True,
+                read_message_history=True, attach_files=True,
+                embed_links=True, manage_messages=True
             )
 
-        channel_name = clean_channel_name(
-            f"{self.selected_game}-{interaction.user.name}"
-        )
+        try:
+            channel = await guild.create_text_channel(
+                name=clean_channel_name(f"{self.selected_game}-{interaction.user.name}"),
+                category=category,
+                overwrites=overwrites,
+                reason="Middleman ticket created"
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ I don't have permission to create ticket channels.",
+                ephemeral=True
+            )
+            return
+        except discord.HTTPException:
+            await interaction.response.send_message(
+                "❌ Discord failed to create the ticket. Try again.",
+                ephemeral=True
+            )
+            return
 
-        # Build the ticket before creating the channel.
-        ticket = {
+        tickets[channel.id] = {
             "owner": interaction.user.id,
             "trader": trader.id,
             "game": self.selected_game,
@@ -409,110 +247,50 @@ class MiddlemanRequestModal(Modal):
             "claimed_by": None
         }
 
-        try:
-            channel = await guild.create_text_channel(
-                name=channel_name,
-                category=category,
-                overwrites=overwrites,
-                topic=make_ticket_topic(ticket),
-                reason="TokyoMs middleman ticket created"
-            )
-
-        except discord.Forbidden:
-            await interaction.response.send_message(
-                "❌ I don't have permission to create ticket channels.",
-                ephemeral=True
-            )
-            return
-
-        except discord.HTTPException as e:
-            await interaction.response.send_message(
-                f"❌ Discord failed to create the ticket.\n`{e}`",
-                ephemeral=True
-            )
-            return
-
-        # Save under the EXACT channel ID Discord returned.
-        tickets[channel.id] = ticket
-        save_tickets()
-
         await interaction.response.send_message(
-            f"🌸 Your **{self.selected_game}** middleman ticket has been created: {channel.mention}",
+            f"✅ Your **{self.selected_game}** middleman ticket has been created: {channel.mention}",
             ephemeral=True
         )
 
         welcome = discord.Embed(
-            title="🌸 Welcome to your Ticket!",
+            title="👑 Welcome to your Ticket!",
             description=(
                 f"Hello {interaction.user.mention}, thanks for opening a "
-                "**TokyoMs Middleman Service Ticket!**\n\n"
-                f"**Game:** {self.selected_game}\n\n"
+                "**Middleman Service Ticket!**\n\n"
+                f"🎮 **Game:** {self.selected_game}\n\n"
                 "A middleman will assist you shortly.\n"
                 "Provide all trade details clearly.\n"
-                "Fake/troll tickets may result in consequences."
+                "Fake/troll tickets will result in consequences."
             ),
-            color=PINK
+            color=EMBED_COLOR
         )
 
         if TICKET_BANNER_URL:
             welcome.set_image(url=TICKET_BANNER_URL)
 
-        welcome.set_footer(
-            text="🌸 TokyoMs • Please wait for a middleman"
-        )
+        welcome.set_footer(text="MM2 MARKET • Please wait for a middleman")
 
         details = discord.Embed(
-            title="🌸 Trade Details",
-            color=PINK
+            title="📋 Trade Details",
+            color=EMBED_COLOR
         )
 
-        details.add_field(
-            name="Game",
-            value=self.selected_game,
-            inline=False
-        )
+        details.add_field(name="🎮 Game", value=self.selected_game, inline=False)
+        details.add_field(name="What Are You Giving?", value=self.giving_input.value, inline=False)
+        details.add_field(name="What Is Your Trader Giving?", value=self.trader_giving_input.value, inline=False)
+        details.add_field(name="Trader", value=f"{trader.mention}\n`{trader.id}`", inline=False)
+        details.add_field(name="Can Join Private Server Links?", value=self.private_input.value, inline=False)
+        details.set_footer(text="MM2 MARKET Service")
 
-        details.add_field(
-            name="What Are You Giving?",
-            value=self.giving_input.value,
-            inline=False
-        )
-
-        details.add_field(
-            name="What Is Your Trader Giving?",
-            value=self.trader_giving_input.value,
-            inline=False
-        )
-
-        details.add_field(
-            name="Trader",
-            value=f"{trader.mention}\n`{trader.id}`",
-            inline=False
-        )
-
-        details.add_field(
-            name="Can Join Private Server Links?",
-            value=self.private_input.value,
-            inline=False
-        )
-
-        details.set_footer(text="🌸 TokyoMs Middleman Service")
-
-        ping_message = (
-            f"{interaction.user.mention} {trader.mention}"
-        )
-
+        ping_message = f"{interaction.user.mention} {trader.mention}"
         if mm_role:
             ping_message += f" {mm_role.mention}"
 
-        try:
-            await channel.send(
-                content=ping_message,
-                embeds=[welcome, details],
-                view=TicketView()
-            )
-        except discord.HTTPException as e:
-            print(f"[TICKET] Could not send ticket message: {e}")
+        await channel.send(
+            content=ping_message,
+            embeds=[welcome, details],
+            view=TicketView()
+        )
 
 
 # ============================================================
@@ -522,43 +300,13 @@ class MiddlemanRequestModal(Modal):
 class GameSelect(discord.ui.Select):
 
     def __init__(self):
-
         options = [
-            discord.SelectOption(
-                label="Murder Mystery 2",
-                emoji="🔪",
-                value="Murder Mystery 2"
-            ),
-            discord.SelectOption(
-                label="Blox Fruits",
-                emoji="🍎",
-                value="Blox Fruits"
-            ),
-            discord.SelectOption(
-                label="Adopt Me",
-                emoji="🐶",
-                value="Adopt Me"
-            ),
-            discord.SelectOption(
-                label="Steal a Brainrot",
-                emoji="🧠",
-                value="Steal a Brainrot"
-            ),
-            discord.SelectOption(
-                label="Grow A Garden",
-                emoji="🌱",
-                value="Grow A Garden"
-            ),
-            discord.SelectOption(
-                label="Blade Ball",
-                emoji="⚔️",
-                value="Blade Ball"
-            ),
-            discord.SelectOption(
-                label="Others",
-                emoji="📝",
-                value="Others"
-            )
+            discord.SelectOption(label="Steal a Brainrot", emoji="🧠", value="Steal a Brainrot"),
+            discord.SelectOption(label="Adopt Me", emoji="🐶", value="Adopt Me"),
+            discord.SelectOption(label="Murder Mystery 2", emoji="🔪", value="Murder Mystery 2"),
+            discord.SelectOption(label="Grow A Garden", emoji="🌱", value="Grow A Garden"),
+            discord.SelectOption(label="Blade Ball", emoji="⚔️", value="Blade Ball"),
+            discord.SelectOption(label="Others", emoji="📝", value="Others")
         ]
 
         super().__init__(
@@ -566,18 +314,17 @@ class GameSelect(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
-            custom_id="tokyoms_game_selection"
+            custom_id="game_selection"
         )
 
     async def callback(self, interaction: discord.Interaction):
-
         await interaction.response.send_modal(
             MiddlemanRequestModal(self.values[0])
         )
 
 
 # ============================================================
-# PANEL VIEW
+# REQUEST PANEL VIEW
 # ============================================================
 
 class TicketPanelView(View):
@@ -593,7 +340,7 @@ class TicketPanelView(View):
 
 class AddUserModal(Modal):
 
-    def __init__(self, channel):
+    def __init__(self, channel: discord.TextChannel):
         super().__init__(title="Add User")
         self.channel = channel
 
@@ -603,11 +350,9 @@ class AddUserModal(Modal):
             required=True,
             max_length=100
         )
-
         self.add_item(self.user_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-
         if not is_middleman(interaction.user):
             await interaction.response.send_message(
                 "❌ Only a middleman can add users to this ticket.",
@@ -615,33 +360,17 @@ class AddUserModal(Modal):
             )
             return
 
-        ticket = get_ticket(self.channel)
-
-        if not ticket:
+        ticket = tickets.get(self.channel.id)
+        if ticket and ticket["claimed_by"] and ticket["claimed_by"] != interaction.user.id:
             await interaction.response.send_message(
-                "❌ Ticket data was not found.",
+                "❌ Only the middleman who claimed this ticket can add users.",
                 ephemeral=True
             )
             return
 
-        if ticket.get("claimed_by"):
-            if ticket["claimed_by"] != interaction.user.id:
-                await interaction.response.send_message(
-                    "❌ Only the middleman who claimed this ticket can add users.",
-                    ephemeral=True
-                )
-                return
-
-        user = await find_user(
-            interaction.guild,
-            self.user_input.value
-        )
-
+        user = await find_user(interaction.guild, self.user_input.value)
         if not user:
-            await interaction.response.send_message(
-                "❌ User not found.",
-                ephemeral=True
-            )
+            await interaction.response.send_message("❌ User not found.", ephemeral=True)
             return
 
         try:
@@ -653,16 +382,13 @@ class AddUserModal(Modal):
                 attach_files=True,
                 embed_links=True
             )
-
             await interaction.response.send_message(
-                f"🌸 Added {user.mention} to the ticket.",
+                f"✅ Added {user.mention} to the ticket.",
                 ephemeral=True
             )
-
             await self.channel.send(
-                f"🌸 {user.mention} was added by {interaction.user.mention}."
+                f"➕ {user.mention} was added by {interaction.user.mention}."
             )
-
         except discord.Forbidden:
             await interaction.response.send_message(
                 "❌ I don't have permission to add that user.",
@@ -679,89 +405,72 @@ class TicketView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    # --------------------------------------------------------
-    # CLAIM
-    # --------------------------------------------------------
-
-    @button(
-        label="Claim Ticket",
-        emoji="✅",
-        style=ButtonStyle.success,
-        custom_id="tokyoms_claim_ticket"
-    )
-    async def claim_ticket(self, interaction, button):
-
+    @button(label="Claim Ticket", emoji="✅", style=ButtonStyle.success, custom_id="claim_ticket")
+    async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_middleman(interaction.user):
-            await interaction.response.send_message(
-                "❌ Only a middleman can claim this ticket.",
-                ephemeral=True
-            )
+            await interaction.response.send_message("❌ Only a middleman can claim this ticket.", ephemeral=True)
             return
 
-        channel = interaction.channel
-
-        if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message(
-                "❌ This button can only be used in a ticket channel.",
-                ephemeral=True
-            )
-            return
-
-        # IMPORTANT FIX:
-        # Recover ticket data from the channel topic if it is not
-        # present in the in-memory dictionary.
-        ticket = get_ticket(channel)
-
+        ticket = tickets.get(interaction.channel.id)
         if not ticket:
-            await interaction.response.send_message(
-                "❌ This channel is not registered as a TokyoMs ticket.",
-                ephemeral=True
-            )
+            await interaction.response.send_message("❌ Ticket data was not found.", ephemeral=True)
             return
 
-        claimed_by = ticket.get("claimed_by")
-
-        if claimed_by:
-            claimed_user = interaction.guild.get_member(claimed_by)
-
-            name = (
-                claimed_user.mention
-                if claimed_user
-                else f"`{claimed_by}`"
-            )
-
+        if ticket["claimed_by"]:
+            claimed_user = interaction.guild.get_member(ticket["claimed_by"])
+            name = claimed_user.mention if claimed_user else "another middleman"
             await interaction.response.send_message(
                 f"❌ This ticket is already claimed by {name}.",
                 ephemeral=True
             )
             return
 
-        # Claim it.
         ticket["claimed_by"] = interaction.user.id
-        tickets[channel.id] = ticket
-        save_tickets()
-
-        # Save the claim directly into the Discord channel topic.
-        await save_ticket_to_channel(channel, ticket)
-
         mm_role = get_middleman_role(interaction.guild)
 
-        # Hide the ticket from the entire MM role.
         if mm_role:
-            try:
-                await channel.set_permissions(
-                    mm_role,
-                    view_channel=False,
-                    send_messages=False,
-                    read_message_history=False
-                )
-            except discord.HTTPException:
-                pass
+            await interaction.channel.set_permissions(
+                mm_role,
+                view_channel=False,
+                send_messages=False,
+                read_message_history=False
+            )
 
-        # Give the claiming middleman direct access.
-        try:
-            await channel.set_permissions(
-                interaction.user,
+        await interaction.channel.set_permissions(
+            interaction.user,
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            attach_files=True,
+            embed_links=True,
+            manage_messages=True
+        )
+
+        await interaction.response.send_message(
+            f"✅ {interaction.user.mention} has claimed this ticket!"
+        )
+
+    @button(label="Unclaim Ticket", emoji="🔓", style=ButtonStyle.secondary, custom_id="unclaim_ticket")
+    async def unclaim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        ticket = tickets.get(interaction.channel.id)
+
+        if not ticket:
+            await interaction.response.send_message("❌ Ticket data was not found.", ephemeral=True)
+            return
+
+        if ticket["claimed_by"] != interaction.user.id:
+            await interaction.response.send_message(
+                "❌ Only the middleman who claimed this ticket can unclaim it.",
+                ephemeral=True
+            )
+            return
+
+        await interaction.channel.set_permissions(interaction.user, overwrite=None)
+
+        mm_role = get_middleman_role(interaction.guild)
+        if mm_role:
+            await interaction.channel.set_permissions(
+                mm_role,
                 view_channel=True,
                 send_messages=True,
                 read_message_history=True,
@@ -769,105 +478,22 @@ class TicketView(View):
                 embed_links=True,
                 manage_messages=True
             )
-        except discord.HTTPException:
-            await interaction.response.send_message(
-                "❌ I couldn't update the ticket permissions.",
-                ephemeral=True
-            )
-            return
-
-        await interaction.response.send_message(
-            f"🌸 {interaction.user.mention} has claimed this ticket!"
-        )
-
-    # --------------------------------------------------------
-    # UNCLAIM
-    # --------------------------------------------------------
-
-    @button(
-        label="Unclaim Ticket",
-        emoji="🔓",
-        style=ButtonStyle.secondary,
-        custom_id="tokyoms_unclaim_ticket"
-    )
-    async def unclaim_ticket(self, interaction, button):
-
-        channel = interaction.channel
-        ticket = get_ticket(channel)
-
-        if not ticket:
-            await interaction.response.send_message(
-                "❌ This channel is not registered as a TokyoMs ticket.",
-                ephemeral=True
-            )
-            return
-
-        if ticket.get("claimed_by") != interaction.user.id:
-            await interaction.response.send_message(
-                "❌ Only the middleman who claimed this ticket can unclaim it.",
-                ephemeral=True
-            )
-            return
 
         ticket["claimed_by"] = None
-        tickets[channel.id] = ticket
-        save_tickets()
-
-        await save_ticket_to_channel(channel, ticket)
-
-        # Remove the personal claim overwrite.
-        try:
-            await channel.set_permissions(
-                interaction.user,
-                overwrite=None
-            )
-        except discord.HTTPException:
-            pass
-
-        mm_role = get_middleman_role(interaction.guild)
-
-        if mm_role:
-            try:
-                await channel.set_permissions(
-                    mm_role,
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                    attach_files=True,
-                    embed_links=True,
-                    manage_messages=True
-                )
-            except discord.HTTPException:
-                pass
-
         await interaction.response.send_message(
             f"🔓 {interaction.user.mention} has unclaimed the ticket."
         )
 
-    # --------------------------------------------------------
-    # CLOSE
-    # --------------------------------------------------------
-
-    @button(
-        label="Close Ticket",
-        emoji="🔒",
-        style=ButtonStyle.danger,
-        custom_id="tokyoms_close_ticket"
-    )
-    async def close_ticket(self, interaction, button):
-
-        channel = interaction.channel
-        ticket = get_ticket(channel)
+    @button(label="Close Ticket", emoji="🔒", style=ButtonStyle.danger, custom_id="close_ticket")
+    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        ticket = tickets.get(interaction.channel.id)
 
         if not ticket:
-            await interaction.response.send_message(
-                "❌ This channel is not registered as a TokyoMs ticket.",
-                ephemeral=True
-            )
+            await interaction.response.send_message("❌ Ticket data was not found.", ephemeral=True)
             return
 
         allowed = (
-            ticket.get("claimed_by") == interaction.user.id
+            ticket["claimed_by"] == interaction.user.id
             or is_owner(interaction.user)
         )
 
@@ -878,34 +504,17 @@ class TicketView(View):
             )
             return
 
-        await interaction.response.send_message(
-            "🔒 Closing this ticket in 5 seconds..."
-        )
-
+        await interaction.response.send_message("🔒 Closing this ticket in 5 seconds...")
         await asyncio.sleep(5)
-
-        tickets.pop(channel.id, None)
-        save_tickets()
+        tickets.pop(interaction.channel.id, None)
 
         try:
-            await channel.delete(
-                reason=f"TokyoMs ticket closed by {interaction.user}"
-            )
+            await interaction.channel.delete(reason=f"Ticket closed by {interaction.user}")
         except (discord.NotFound, discord.Forbidden):
             pass
 
-    # --------------------------------------------------------
-    # ADD USER
-    # --------------------------------------------------------
-
-    @button(
-        label="Add User",
-        emoji="➕",
-        style=ButtonStyle.primary,
-        custom_id="tokyoms_add_user"
-    )
-    async def add_user(self, interaction, button):
-
+    @button(label="Add User", emoji="➕", style=ButtonStyle.primary, custom_id="add_user")
+    async def add_user(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_middleman(interaction.user):
             await interaction.response.send_message(
                 "❌ Only a middleman can use **Add User**.",
@@ -913,53 +522,43 @@ class TicketView(View):
             )
             return
 
-        ticket = get_ticket(interaction.channel)
-
-        if not ticket:
+        ticket = tickets.get(interaction.channel.id)
+        if ticket and ticket["claimed_by"] and ticket["claimed_by"] != interaction.user.id:
             await interaction.response.send_message(
-                "❌ This channel is not registered as a TokyoMs ticket.",
+                "❌ Only the middleman who claimed this ticket can use Add User.",
                 ephemeral=True
             )
             return
 
-        if ticket.get("claimed_by"):
-            if ticket["claimed_by"] != interaction.user.id:
-                await interaction.response.send_message(
-                    "❌ Only the middleman who claimed this ticket can use Add User.",
-                    ephemeral=True
-                )
-                return
-
-        await interaction.response.send_modal(
-            AddUserModal(interaction.channel)
-        )
+        await interaction.response.send_modal(AddUserModal(interaction.channel))
 
 
 # ============================================================
-# PANEL COMMAND
+# TICKET PANEL COMMAND
 # ============================================================
 
 @bot.command(name="panel")
 @commands.has_permissions(administrator=True)
-async def ticketpanel(ctx):
-
+async def ticketpanel(ctx: commands.Context):
     embed = discord.Embed(
-        title="🌸 TokyoMs | Middleman Service",
+        title="MM2 Market | MM Service",
         description=(
-            "Welcome to the **TokyoMs Middleman Service**.\n\n"
-            "We provide a safe and secure way to complete trades "
-            "with the help of a trusted middleman.\n\n"
-            "**How to request a middleman:**\n"
-            "Select your game from the menu below and complete "
-            "the request form.\n\n"
+            "Welcome to our middleman Service centre.\n\n"
+            "At MM2 MARKET, we value and provide a safe "
+            "and secure way to exchange your goods.\n\n"
+            "**If you've found a trade and want to ensure "
+            "your safety, you can use our middleman service.**\n\n"
+            "Our secure middleman service will ensure the "
+            "trade goes smoothly and both users receive "
+            "their sides.\n\n"
+            "---\n"
             "**Usage Conditions:**\n"
-            "• Select the correct game.\n"
-            "• Both parties must agree to the trade.\n"
-            "• State all trade details clearly.\n"
-            "• Fake or troll tickets may result in punishment.\n\n"
-            "🌸 A middleman will assist you once your ticket is created."
+            "• Select the correct game before requesting a middleman.\n"
+            "• Both parties agree to trade before requesting a middleman.\n"
+            "• State the trade details clearly.\n"
+            "• Fake or troll tickets will result in punishments."
         ),
-        color=PINK
+        color=EMBED_COLOR
     )
 
     if PANEL_BANNER_URL:
@@ -968,19 +567,17 @@ async def ticketpanel(ctx):
     if PANEL_ICON_URL:
         embed.set_thumbnail(url=PANEL_ICON_URL)
 
-    embed.set_footer(
-        text="🌸 TokyoMs • Trusted & Secure"
-    )
+    embed.set_footer(text="MM2 Market • Trusted & Secure")
 
-    await ctx.send(
-        embed=embed,
-        view=TicketPanelView()
-    )
+    await ctx.send(embed=embed, view=TicketPanelView())
 
+
+# ============================================================
+# COMMAND ERROR
+# ============================================================
 
 @ticketpanel.error
-async def ticketpanel_error(ctx, error):
-
+async def ticketpanel_error(ctx: commands.Context, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send(
             "❌ You need Administrator permission to use `$panel`.",
@@ -994,33 +591,13 @@ async def ticketpanel_error(ctx, error):
 
 @bot.event
 async def on_ready():
-
-    # Persistent views allow existing Discord buttons to continue
-    # working after a bot restart.
-    try:
-        bot.add_view(TicketPanelView())
-        bot.add_view(TicketView())
-    except Exception as e:
-        print(f"[VIEWS] Could not register persistent views: {e}")
-
-    # Recover ticket records from existing ticket channel topics.
-    recovered = 0
-
-    for guild in bot.guilds:
-        for channel in guild.text_channels:
-            ticket = parse_ticket_topic(channel.topic)
-
-            if ticket:
-                tickets[channel.id] = ticket
-                recovered += 1
-
-    save_tickets()
+    bot.add_view(TicketPanelView())
+    bot.add_view(TicketView())
 
     print("========================================")
     print(f"Logged in as {bot.user}")
     print(f"Bot ID: {bot.user.id}")
-    print("🌸 TokyoMs Middleman Ticket System Online")
-    print(f"Recovered tickets: {recovered}")
+    print("TradeVault MM Ticket System Online")
     print("========================================")
 
 
