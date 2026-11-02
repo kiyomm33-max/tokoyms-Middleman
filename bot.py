@@ -17,13 +17,13 @@ BANNER_FILE = ASSET_DIR / "u7buy_banner.png"
 ICON_FILE = ASSET_DIR / "u7buy_icon.webp"
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-MIDDLEMAN_ROLE_ID = int(os.getenv("MIDDLEMAN_ROLE_ID", "1558800992626020444"))
-OWNER_ROLE_ID = int(os.getenv("OWNER_ROLE_ID", "1556390123203989644"))
-TICKET_CATEGORY_ID = int(os.getenv("TICKET_CATEGORY_ID", "1558794011911782490"))
+MIDDLEMAN_ROLE_ID = int(os.getenv("MIDDLEMAN_ROLE_ID", "1565787085946753058"))
+OWNER_ROLE_ID = int(os.getenv("OWNER_ROLE_ID", "1565787085946753058"))
+TICKET_CATEGORY_ID = int(os.getenv("TICKET_CATEGORY_ID", "1565787258848813057"))
 EMBED_COLOR = discord.Color.from_rgb(255, 103, 47)
 
 if not TOKEN:
-    raise RuntimeError("DISCORD_TOKEN is not set")
+    raise RuntimeError("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.message_content = True
